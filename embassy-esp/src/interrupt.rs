@@ -2,10 +2,11 @@ use core::ptr;
 
 use atomic_polyfill::{compiler_fence, Ordering};
 use embassy_riscv::interrupt::{Interrupt, InterruptExt};
-pub use esp32c3::interrupt::Interrupt as interrupt_source;
-use esp32c3::{INTERRUPT_CORE0, SYSTEM};
 use riscv::register::mcause;
 use riscv_atomic_emulation_trap as _;
+
+pub use crate::pac::interrupt::Interrupt as interrupt_source;
+use crate::pac::{INTERRUPT_CORE0, SYSTEM};
 //TODO SETUP BOOT LINKING
 // User code shouldn't usually take the mutable TrapFrame or the TrapFrame in
 // general. However this makes things like preemtive multitasking easier in

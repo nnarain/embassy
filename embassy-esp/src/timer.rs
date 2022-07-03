@@ -1,18 +1,18 @@
 //! General-purpose timers
-//! 
 //!
-//! 
+//!
+//!
 // use core::macros::builtin::derive;
-use core::prelude::rust_2021::derive;
 use core::fmt::Debug;
-use core::result::Result::{Err, Ok, self};
-use embedded_hal::{
-    timer::{Cancel, CountDown, Periodic},
-    watchdog::WatchdogDisable,
-};
+use core::prelude::rust_2021::derive;
+use core::result::Result::{self, Err, Ok};
+
+use embedded_hal::timer::{Cancel, CountDown, Periodic};
+use embedded_hal::watchdog::WatchdogDisable;
 use void::Void;
 
-use esp32c3::{timg0::RegisterBlock, TIMG0, TIMG1};
+use crate::pac::timg0::RegisterBlock;
+use crate::pac::{TIMG0, TIMG1};
 
 /// Custom timer error type
 #[derive(Debug)]
@@ -62,21 +62,15 @@ pub trait Instance {
     fn reset_counter(&mut self) {
         let reg_block = self.register_block();
 
-        reg_block
-            .t0loadlo
-            .write(|w| unsafe { w.t0_load_lo().bits(0) });
+        reg_block.t0loadlo.write(|w| unsafe { w.t0_load_lo().bits(0) });
 
-        reg_block
-            .t0loadhi
-            .write(|w| unsafe { w.t0_load_hi().bits(0) });
+        reg_block.t0loadhi.write(|w| unsafe { w.t0_load_hi().bits(0) });
 
         reg_block.t0load.write(|w| unsafe { w.t0_load().bits(1) });
     }
 
     fn set_counter_active(&mut self, state: bool) {
-        self.register_block()
-            .t0config
-            .modify(|_, w| w.t0_en().bit(state));
+        self.register_block().t0config.modify(|_, w| w.t0_en().bit(state));
     }
 
     fn is_counter_active(&mut self) -> bool {
@@ -96,17 +90,11 @@ pub trait Instance {
     }
 
     fn set_alarm_active(&mut self, state: bool) {
-        self.register_block()
-            .t0config
-            .modify(|_, w| w.t0_alarm_en().bit(state));
+        self.register_block().t0config.modify(|_, w| w.t0_alarm_en().bit(state));
     }
 
     fn is_alarm_active(&mut self) -> bool {
-        self.register_block()
-            .t0config
-            .read()
-            .t0_alarm_en()
-            .bit_is_set()
+        self.register_block().t0config.read().t0_alarm_en().bit_is_set()
     }
 
     fn load_alarm_value(&mut self, value: u64) {
@@ -116,13 +104,9 @@ pub trait Instance {
 
         let reg_block = self.register_block();
 
-        reg_block
-            .t0alarmlo
-            .write(|w| unsafe { w.t0_alarm_lo().bits(low) });
+        reg_block.t0alarmlo.write(|w| unsafe { w.t0_alarm_lo().bits(low) });
 
-        reg_block
-            .t0alarmhi
-            .write(|w| unsafe { w.t0_alarm_hi().bits(high) });
+        reg_block.t0alarmhi.write(|w| unsafe { w.t0_alarm_hi().bits(high) });
     }
 
     fn set_wdt_enabled(&mut self, enabled: bool) {
@@ -138,9 +122,7 @@ pub trait Instance {
             reg_block.wdtconfig0.write(|w| w.wdt_en().bit(true));
         }
 
-        reg_block
-            .wdtwprotect
-            .write(|w| unsafe { w.wdt_wkey().bits(0u32) });
+        reg_block.wdtwprotect.write(|w| unsafe { w.wdt_wkey().bits(0u32) });
     }
 
     fn listen(&mut self) {
@@ -162,9 +144,7 @@ pub trait Instance {
     }
 
     fn clear_interrupt(&mut self) {
-        self.register_block()
-            .int_clr_timers
-            .write(|w| w.t0_int_clr().set_bit());
+        self.register_block().int_clr_timers.write(|w| w.t0_int_clr().set_bit());
     }
 }
 

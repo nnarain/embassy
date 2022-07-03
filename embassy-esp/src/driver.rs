@@ -1,18 +1,19 @@
 use core::cell::Cell;
 use core::marker::Send;
-use core::{mem, ptr};
-use critical_section::CriticalSection;
 use core::option::Option;
-use core::panic;
+use core::{mem, panic, ptr};
+
+use critical_section::CriticalSection;
 use embassy::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy::blocking_mutex::CriticalSectionMutex as Mutex;
-use crate::interrupt::ESP32C3_Interrupts;
+use embassy::time::driver::{AlarmHandle, Driver};
+
 // use AtomicPtr;
 // use embassy::interrupt::{Interrupt, InterruptExt};
 use crate::interrupt;
+use crate::interrupt::ESP32C3_Interrupts;
+use crate::pac::SYSTIMER;
 use crate::systimer;
-use embassy::time::driver::{AlarmHandle, Driver};
-use esp32c3::SYSTIMER;
 
 pub struct BaseInterrupt {
     external_interrupt_id: interrupt::interrupt_source,
@@ -20,7 +21,7 @@ pub struct BaseInterrupt {
     priority: interrupt::Priority,
     // __handler: &'static embassy::interrupt::Handler,
 }
-impl BaseInterrupt{
+impl BaseInterrupt {
     fn enable(&mut self) {
         interrupt::ESP32C3_Interrupts::enable(self.external_interrupt_id as isize, self.cpu_interrupt);
         interrupt::ESP32C3_Interrupts::set_kind(self.cpu_interrupt, interrupt::InterruptKind::Level);
@@ -29,13 +30,8 @@ impl BaseInterrupt{
 }
 // enables the interrupts and sets interrupt type
 
-
-
-
 //TODO: disable watchdog timers on super WDT, RTC WDT, and TIMG
-pub fn generate_systimer_interrupt_structs(
-    prio: interrupt::Priority,
-) -> (BaseInterrupt, BaseInterrupt, BaseInterrupt) {
+pub fn generate_systimer_interrupt_structs(prio: interrupt::Priority) -> (BaseInterrupt, BaseInterrupt, BaseInterrupt) {
     (
         BaseInterrupt {
             external_interrupt_id: crate::interrupt::interrupt_source::SYSTIMER_TARGET0,
@@ -80,7 +76,6 @@ impl AlarmState {
             callback: Cell::new(ptr::null()),
             ctx: Cell::new(ptr::null_mut()),
             allocated: Cell::new(false),
-
         }
     }
 }
@@ -96,8 +91,6 @@ pub struct SysTimerDriver {
     // esp32c3 has a 48-bit timer, that should be able to count for ~3 months (conservative estimate)
 }
 
-
-
 // register driver with the rest of embassy
 
 const ALARM_STATE_NONE: AlarmState = AlarmState::new();
@@ -106,26 +99,19 @@ embassy::time_driver_impl!(static DRIVER: SysTimerDriver = SysTimerDriver{
     alarms: Mutex::const_new(CriticalSectionRawMutex::new(), [ALARM_STATE_NONE; ALARM_COUNT]),
 });
 
-
 impl SysTimerDriver {
     pub fn init(&'static self, irq_prio: crate::interrupt::Priority) {
-        let (mut syst0, mut syst1,mut  syst2) = generate_systimer_interrupt_structs(irq_prio);
-        syst0.enable();syst1.enable(); syst2.enable();
-        
+        let (mut syst0, mut syst1, mut syst2) = generate_systimer_interrupt_structs(irq_prio);
+        syst0.enable();
+        syst1.enable();
+        syst2.enable();
     }
     fn get_time(&self) -> u64 {
         unsafe {
             let systimer = &*SYSTIMER::ptr();
-            systimer
-                .unit0_op
-                .write(|w| w.timer_unit0_update().set_bit());
+            systimer.unit0_op.write(|w| w.timer_unit0_update().set_bit());
 
-            while !systimer
-                .unit0_op
-                .read()
-                .timer_unit0_value_valid()
-                .bit_is_set()
-            {}
+            while !systimer.unit0_op.read().timer_unit0_value_valid().bit_is_set() {}
 
             let value_lo = systimer.unit0_value_lo.read().bits();
             let value_hi = systimer.unit0_value_hi.read().bits();
@@ -145,7 +131,7 @@ impl SysTimerDriver {
         ESP32C3_Interrupts::clear(interrupt::CpuInterrupt::Interrupt2);
     }
     fn clear_target2(&self) {
-                systimer::clear_target2_interrupt();
+        systimer::clear_target2_interrupt();
 
         ESP32C3_Interrupts::clear(interrupt::CpuInterrupt::Interrupt3);
     }
@@ -157,8 +143,8 @@ impl SysTimerDriver {
     }
     /// deallocate an alarm: might be used at some point in the future
     #[allow(dead_code)]
-    fn deallocate_alarm(&self, id: u8 ,_cs: CriticalSection,){
-        unsafe{
+    fn deallocate_alarm(&self, id: u8, _cs: CriticalSection) {
+        unsafe {
             let alarm = self.alarms.borrow(_cs).get_unchecked(id as usize);
             alarm.allocated.set(false);
         }
@@ -171,17 +157,14 @@ impl SysTimerDriver {
             2 => self.clear_target2(),
             _ => panic!(),
         };
-        critical_section::with( |cs| {
+        critical_section::with(|cs| {
             // self.deallocate_alarm(id, cs);
             self.trigger_alarm(id, cs);
         })
-        
     }
 
     fn get_alarm<'a>(&'a self, _cs: CriticalSection<'a>, id: u8) -> &'a AlarmState {
-        unsafe {
-            self.alarms.borrow(_cs).get_unchecked(id as usize)
-        }
+        unsafe { self.alarms.borrow(_cs).get_unchecked(id as usize) }
     }
     fn set_target0_alarm(&self, timestamp: u64) {
         systimer::set_target0_alarm_from_timestamp(timestamp);
@@ -199,13 +182,12 @@ impl Driver for SysTimerDriver {
     fn now(&self) -> u64 {
         self.get_time()
     }
-    unsafe fn allocate_alarm(& self) -> Option<AlarmHandle> {
-        return critical_section::with(|_cs|  {
+    unsafe fn allocate_alarm(&self) -> Option<AlarmHandle> {
+        return critical_section::with(|_cs| {
             let alarms = self.alarms.borrow(_cs);
             for i in 0..ALARM_COUNT {
-
                 let c = alarms.get_unchecked(i);
-                if ! c.allocated.get() {
+                if !c.allocated.get() {
                     // set alarm so it is not overwritten
                     c.allocated.set(true);
                     return Option::Some(AlarmHandle::new(i as u8));

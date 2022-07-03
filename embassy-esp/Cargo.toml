@@ -22,7 +22,8 @@ atomic-polyfill = "0.1.5"
 
 futures = { version = "0.3.17", default-features = false, features = ["async-await"] }
 heapless = { version = "0.7.5", default-features = false }
-esp32c3 = "0.4.0"
+# esp32c3 = "0.4.0"
+# esp32c3-hal = {path = "../../esp-hal/esp32c3-hal", version = "0.1.0"}
 riscv                       = "0.7"
 critical-section = "0.2.5"
 embedded-hal = { version = "0.2", features = ["unproven"] }

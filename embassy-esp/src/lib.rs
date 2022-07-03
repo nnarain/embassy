@@ -1,5 +1,6 @@
 #![no_std]
-use esp32c3::Peripherals;
+// use esp32c3::Peripherals;
+use esp32c3_hal::pac::Peripherals;
 // use esp32;
 pub mod serial;
 pub use serial::Serial;
@@ -10,9 +11,11 @@ pub mod rtc_cntl;
 pub mod systimer;
 pub mod timer;
 
-pub mod pac {
-    pub use esp32c3::*;
-}
+// pub mod pac {
+//     pub use esp32c3::*;
+// }
+pub use esp32c3_hal::pac;
+
 pub mod config {
     #[non_exhaustive]
     pub struct Config {

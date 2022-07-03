@@ -2,9 +2,10 @@
 
 use embedded_hal::serial::{Read, Write};
 
+use crate::pac::uart0::RegisterBlock;
 #[cfg(any(feature = "esp32", feature = "esp32s3"))]
 use crate::pac::UART2;
-use esp32c3::{uart0::RegisterBlock, UART0, UART1};
+use crate::pac::{UART0, UART1};
 
 const UART_FIFO_SIZE: u16 = 128;
 
@@ -87,21 +88,11 @@ pub trait Instance {
     }
 
     fn get_tx_fifo_count(&mut self) -> u16 {
-        self.register_block()
-            .status
-            .read()
-            .txfifo_cnt()
-            .bits()
-            .into()
+        self.register_block().status.read().txfifo_cnt().bits().into()
     }
 
     fn get_rx_fifo_count(&mut self) -> u16 {
-        self.register_block()
-            .status
-            .read()
-            .rxfifo_cnt()
-            .bits()
-            .into()
+        self.register_block().status.read().rxfifo_cnt().bits().into()
     }
 
     fn is_tx_idle(&mut self) -> bool {
@@ -210,13 +201,7 @@ where
 
     fn read(&mut self) -> nb::Result<u8, Self::Error> {
         if self.uart.get_rx_fifo_count() > 0 {
-            let value = self
-                .uart
-                .register_block()
-                .fifo
-                .read()
-                .rxfifo_rd_byte()
-                .bits();
+            let value = self.uart.register_block().fifo.read().rxfifo_rd_byte().bits();
 
             Ok(value)
         } else {
