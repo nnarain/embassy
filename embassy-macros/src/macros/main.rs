@@ -11,7 +11,9 @@ const HAL: Option<&str> = Some("embassy_stm32");
 const HAL: Option<&str> = Some("embassy_nrf");
 #[cfg(feature = "rp")]
 const HAL: Option<&str> = Some("embassy_rp");
-#[cfg(not(any(feature = "stm32", feature = "nrf", feature = "rp")))]
+#[cfg(feature = "esp")]
+const HAL: Option<&str> = Some("embassy_esp");
+#[cfg(not(any(feature = "stm32", feature = "nrf", feature = "rp", feature = "esp")))]
 const HAL: Option<&str> = None;
 
 #[derive(Debug, FromMeta)]
@@ -79,6 +81,7 @@ pub fn run(args: syn::AttributeArgs, f: syn::ItemFn) -> Result<TokenStream, Toke
         }
     };
 
+    // Embedded
     #[cfg(all(not(feature = "std"), not(feature = "wasm")))]
     let main = {
         let config = args.config.map(|s| s.parse::<syn::Expr>().unwrap()).unwrap_or_else(|| {
@@ -101,7 +104,7 @@ pub fn run(args: syn::AttributeArgs, f: syn::ItemFn) -> Result<TokenStream, Toke
         };
 
         quote! {
-            #[cortex_m_rt::entry]
+            #[riscv_rt::entry]
             fn main() -> ! {
                 #hal_setup
 
